@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Settings, Power, Video, VideoOff, Hand, Lightbulb, Printer, Globe, Box } from 'lucide-react';
+import { Mic, MicOff, Settings, Power, Video, VideoOff, Hand, Lightbulb, Globe } from 'lucide-react';
 
 const ToolsModule = ({
     isConnected,
@@ -107,28 +107,6 @@ const ToolsModule = ({
                         } `}
                 >
                     <Lightbulb size={24} />
-                </button>
-
-                {/* 3D Printer Control */}
-                <button
-                    onClick={onTogglePrinter}
-                    className={`p-3 rounded-full border-2 transition-all duration-300 ${showPrinterWindow
-                        ? 'border-green-400 bg-green-400/10 text-green-400 hover:bg-green-400/20'
-                        : 'border-white/10 text-gray-500 hover:border-green-500 hover:text-green-500'
-                        } `}
-                >
-                    <Printer size={24} />
-                </button>
-
-                {/* CAD Agent Toggle */}
-                <button
-                    onClick={onToggleCad}
-                    className={`p-3 rounded-full border-2 transition-all duration-300 ${showCadWindow
-                        ? 'border-teal-400 bg-teal-400/10 text-teal-400 hover:bg-teal-400/20 shadow-[0_0_15px_rgba(94,234,212,0.2)]'
-                        : 'border-white/10 text-gray-500 hover:border-teal-500/30 hover:text-teal-400'
-                        } `}
-                >
-                    <Box size={24} />
                 </button>
 
                 {/* Web Agent Toggle */}

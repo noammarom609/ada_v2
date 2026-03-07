@@ -1639,6 +1639,7 @@ function App() {
                                 logs={browserData.logs}
                                 onClose={() => setShowBrowserWindow(false)}
                                 socket={socket}
+                                onResize={(w, h) => setElementSizes(prev => ({ ...prev, browser: { w, h } }))}
                             />
                         </div>
                     </div>
