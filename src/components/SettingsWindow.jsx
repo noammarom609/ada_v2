@@ -16,6 +16,7 @@ const TOOLS = [
     { id: 'discover_printers', label: 'Discover Printers' },
     { id: 'print_stl', label: 'Print 3D Model' },
     { id: 'iterate_cad', label: 'Iterate CAD' },
+    { id: 'run_command', label: 'Computer Control' },
 ];
 
 const SettingsWindow = ({

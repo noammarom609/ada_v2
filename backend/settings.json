@@ -1,23 +1,24 @@
 {
     "user_name": "Noam",
-    "ai_name": "NEXUS",
+    "ai_name": "NEXUS1",
     "setup_complete": true,
     "face_auth_enabled": false,
     "tool_permissions": {
         "generate_cad": true,
         "run_web_agent": true,
-        "write_file": false,
-        "read_directory": false,
-        "read_file": false,
-        "create_project": false,
-        "switch_project": false,
-        "list_projects": false,
-        "create_directory": false,
+        "write_file": true,
+        "read_directory": true,
+        "read_file": true,
+        "create_project": true,
+        "switch_project": true,
+        "list_projects": true,
+        "run_command": false,
+        "create_directory": true,
         "iterate_cad": false,
         "print_stl": false,
         "discover_printers": false,
         "control_light": false,
-        "list_smart_devices": false
+        "list_smart_devices": true
     },
     "printers": [
         {

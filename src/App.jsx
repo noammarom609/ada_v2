@@ -51,7 +51,7 @@ function App() {
 
 
     const [isConnected, setIsConnected] = useState(true); // Power state DEFAULT ON
-    const [isMuted, setIsMuted] = useState(true); // Mic state DEFAULT MUTED
+    const [isMuted, setIsMuted] = useState(false); // Mic state DEFAULT UNMUTED
     const [isVideoOn, setIsVideoOn] = useState(false); // Video state
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
@@ -304,8 +304,8 @@ function App() {
             socket.emit('discover_kasa');
             socket.emit('discover_printers');
 
-            // Connect to model with small delay for socket stability
-            const timer = setTimeout(() => {
+            // Connect to model once WebSocket transport is ready
+            const tryStartAudio = () => {
                 const index = micDevices.findIndex(d => d.deviceId === selectedMicId);
                 const queryDevice = micDevices.find(d => d.deviceId === selectedMicId);
                 const deviceName = queryDevice ? queryDevice.label : null;
@@ -317,7 +317,24 @@ function App() {
                     device_name: deviceName,
                     muted: isMuted
                 });
-            }, 500);
+            };
+
+            // Wait for WebSocket upgrade before sending start_audio
+            if (socket.io?.engine?.transport?.name === 'websocket') {
+                tryStartAudio();
+            } else {
+                const onUpgrade = () => {
+                    console.log("Socket upgraded to WebSocket, starting audio...");
+                    tryStartAudio();
+                };
+                socket.io?.engine?.once('upgrade', onUpgrade);
+                // Fallback if already upgraded or upgrade doesn't fire
+                const timer = setTimeout(() => {
+                    socket.io?.engine?.off('upgrade', onUpgrade);
+                    console.log("Fallback: starting audio after timeout");
+                    tryStartAudio();
+                }, 2000);
+            }
         }
     }, [isConnected, isAuthenticated, socketConnected, micDevices, selectedMicId]);
 

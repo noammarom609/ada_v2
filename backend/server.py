@@ -70,7 +70,8 @@ DEFAULT_SETTINGS = {
         "read_file": True,
         "create_project": True,
         "switch_project": True,
-        "list_projects": True
+        "list_projects": True,
+        "run_command": False
     },
     "printers": [], # List of {host, port, name, type}
     "kasa_devices": [], # List of {ip, alias, model}
@@ -972,6 +973,15 @@ async def update_settings(sid, data):
     save_settings()
     # Broadcast new full settings
     await sio.emit('settings', SETTINGS)
+
+    # Restart session so Gemini gets the new name in system prompt
+    if audio_loop and ("user_name" in data or "ai_name" in data):
+        print(f"[SERVER] Name changed, restarting session...")
+        await sio.emit('status', {'msg': 'Restarting...'})
+        audio_loop.stop()
+        audio_loop = None
+        await asyncio.sleep(1)
+        await start_audio(sid)
 
 @sio.event
 async def complete_setup(sid, data):

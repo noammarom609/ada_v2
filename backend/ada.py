@@ -167,6 +167,21 @@ get_print_status_tool = {
     }
 }
 
+run_command_tool = {
+    "name": "run_command",
+    "description": "Executes a system command on the user's computer. Use this to open applications (e.g., 'notepad', 'calc', 'chrome'), run scripts, or perform system operations. For opening apps, use 'start <app>' on Windows.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "command": {
+                "type": "STRING",
+                "description": "The system command to execute (e.g., 'start notepad', 'start chrome https://google.com', 'start calc')."
+            }
+        },
+        "required": ["command"]
+    }
+}
+
 iterate_cad_tool = {
     "name": "iterate_cad",
     "description": "Modifies or iterates on the current CAD design based on user feedback. Use this when the user asks to adjust, change, modify, or iterate on the existing 3D model (e.g., 'make it taller', 'add a handle', 'reduce the thickness').",
@@ -180,7 +195,7 @@ iterate_cad_tool = {
     "behavior": "NON_BLOCKING"
 }
 
-tools = [{'google_search': {}}, {"function_declarations": [generate_cad, run_web_agent, create_project_tool, switch_project_tool, list_projects_tool, list_smart_devices_tool, control_light_tool, discover_printers_tool, print_stl_tool, get_print_status_tool, iterate_cad_tool] + tools_list[0]['function_declarations'][1:]}]
+tools = [{'google_search': {}}, {"function_declarations": [generate_cad, run_web_agent, run_command_tool, create_project_tool, switch_project_tool, list_projects_tool, list_smart_devices_tool, control_light_tool, discover_printers_tool, print_stl_tool, get_print_status_tool, iterate_cad_tool] + tools_list[0]['function_declarations'][1:]}]
 
 # --- CONFIG UPDATE: Enabled Transcription ---
 def build_config(user_name="", ai_name="Ada"):
@@ -194,7 +209,15 @@ def build_config(user_name="", ai_name="Ada"):
     instruction_parts.append(
         "When answering, respond using complete and concise sentences "
         "to keep a quick pacing and keep the conversation flowing. "
-        "You have a fun personality."
+        "You have a fun personality. "
+    )
+    instruction_parts.append(
+        "IMPORTANT: When the user pauses or trails off mid-thought, "
+        "do NOT immediately give a full answer. Instead, briefly ask if they are done talking "
+        "or still thinking. For example, say something like 'still thinking?' or 'you done?' "
+        "or in Hebrew 'סיימת?' or 'אתה עוד חושב?'. "
+        "Only give your full response after they confirm they are done. "
+        "This is critical - the user often pauses to think and does not want to be interrupted."
     )
 
     return types.LiveConnectConfig(
@@ -208,6 +231,15 @@ def build_config(user_name="", ai_name="Ada"):
                 prebuilt_voice_config=types.PrebuiltVoiceConfig(
                     voice_name="Kore"
                 )
+            )
+        ),
+        realtime_input_config=types.RealtimeInputConfig(
+            automatic_activity_detection=types.AutomaticActivityDetection(
+                disabled=False,
+                start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_LOW,
+                end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_LOW,
+                prefix_padding_ms=300,
+                silence_duration_ms=2000,
             )
         )
     )
@@ -310,6 +342,13 @@ class AudioLoop:
         # Reset transcription tracking for new turn
         self._last_input_transcription = ""
         self._last_output_transcription = ""
+
+    def update_names(self, user_name=None, ai_name=None):
+        if user_name is not None:
+            self.user_name = user_name
+        if ai_name is not None:
+            self.ai_name = ai_name
+        print(f"[ADA DEBUG] [CONFIG] Updated names: user={self.user_name}, ai={self.ai_name}")
 
     def update_permissions(self, new_perms):
         print(f"[ADA DEBUG] [CONFIG] Updating tool permissions: {new_perms}")
@@ -545,6 +584,39 @@ class AudioLoop:
 
 
 
+    async def handle_run_command(self, command):
+        """Execute a system command and return the result."""
+        print(f"[ADA DEBUG] [CMD] Executing: '{command}'")
+        try:
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                shell=True
+            )
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+            output = stdout.decode('utf-8', errors='replace').strip()
+            error = stderr.decode('utf-8', errors='replace').strip()
+
+            if process.returncode == 0:
+                result = f"Command executed successfully."
+                if output:
+                    result += f" Output: {output[:500]}"
+                print(f"[ADA DEBUG] [CMD] Success: {result[:200]}")
+                return result
+            else:
+                result = f"Command failed (exit code {process.returncode})."
+                if error:
+                    result += f" Error: {error[:500]}"
+                print(f"[ADA DEBUG] [CMD] Failed: {result[:200]}")
+                return result
+        except asyncio.TimeoutError:
+            print(f"[ADA DEBUG] [CMD] Timeout after 30s")
+            return "Command timed out after 30 seconds. It may still be running in the background."
+        except Exception as e:
+            print(f"[ADA DEBUG] [CMD] Error: {e}")
+            return f"Error executing command: {str(e)}"
+
     async def handle_write_file(self, path, content):
         print(f"[ADA DEBUG] [FS] Writing file: '{path}'")
         
@@ -732,7 +804,7 @@ class AudioLoop:
                         print("The tool was called")
                         function_responses = []
                         for fc in response.tool_call.function_calls:
-                            if fc.name in ["generate_cad", "run_web_agent", "write_file", "read_directory", "read_file", "create_project", "switch_project", "list_projects", "list_smart_devices", "control_light", "discover_printers", "print_stl", "get_print_status", "iterate_cad"]:
+                            if fc.name in ["generate_cad", "run_web_agent", "run_command", "write_file", "read_directory", "read_file", "create_project", "switch_project", "list_projects", "list_smart_devices", "control_light", "discover_printers", "print_stl", "get_print_status", "iterate_cad"]:
                                 prompt = fc.args.get("prompt", "") # Prompt is not present for all tools
                                 
                                 # Check Permissions (Default to True if not set)
@@ -816,6 +888,15 @@ class AudioLoop:
                                     function_responses.append(function_response)
 
 
+
+                                elif fc.name == "run_command":
+                                    command = fc.args["command"]
+                                    print(f"[ADA DEBUG] [TOOL] Tool Call: 'run_command' command='{command}'")
+                                    result_text = await self.handle_run_command(command)
+                                    function_response = types.FunctionResponse(
+                                        id=fc.id, name=fc.name, response={"result": result_text}
+                                    )
+                                    function_responses.append(function_response)
 
                                 elif fc.name == "write_file":
                                     path = fc.args["path"]
