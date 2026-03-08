@@ -119,6 +119,8 @@ async function cloudFetch(path, options = {}) {
     });
 
     if (res.status === 401) {
+        const errBody = await res.json().catch(() => ({}));
+        console.error('[Auth] 401 detail:', errBody.detail, '| path:', path);
         clearTokens();
         throw new Error('Session expired');
     }

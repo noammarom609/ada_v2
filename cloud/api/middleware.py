@@ -32,6 +32,8 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="Invalid token: no user ID")
         return payload
     except JWTError as e:
+        print(f"[Auth Middleware] JWT decode failed: {e}")
+        print(f"[Auth Middleware] JWT secret set: {bool(SUPABASE_JWT_SECRET)}, length: {len(SUPABASE_JWT_SECRET)}")
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 
