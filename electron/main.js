@@ -210,67 +210,20 @@ app.whenReady().then(() => {
     });
 
     // ── Auto-Updater (GitHub Releases) ──────────────────────────
+    // Checks for updates BEFORE the app loads. If an update is found,
+    // it downloads and installs it immediately (app restarts).
     if (!isDev) {
         autoUpdater.autoDownload = true;
         autoUpdater.autoInstallOnAppQuit = true;
 
-        autoUpdater.on('checking-for-update', () => {
-            console.log('[Updater] Checking for updates...');
-        });
-
-        autoUpdater.on('update-available', (info) => {
-            console.log('[Updater] Update available:', info.version);
-            if (mainWindow) {
-                mainWindow.webContents.send('update-status', {
-                    status: 'downloading',
-                    version: info.version,
-                });
-            }
-        });
-
-        autoUpdater.on('update-not-available', () => {
-            console.log('[Updater] App is up to date.');
-        });
-
-        autoUpdater.on('download-progress', (progress) => {
-            console.log(`[Updater] Download: ${Math.round(progress.percent)}%`);
-            if (mainWindow) {
-                mainWindow.webContents.send('update-status', {
-                    status: 'progress',
-                    percent: Math.round(progress.percent),
-                });
-            }
-        });
-
-        autoUpdater.on('update-downloaded', (info) => {
-            console.log('[Updater] Update downloaded:', info.version);
-            if (mainWindow) {
-                mainWindow.webContents.send('update-status', {
-                    status: 'ready',
-                    version: info.version,
-                });
-            }
-        });
-
-        autoUpdater.on('error', (err) => {
-            console.error('[Updater] Error:', err.message);
-        });
-
-        // Check for updates after window is ready (delay to avoid startup load)
-        const checkForUpdates = () => {
-            autoUpdater.checkForUpdatesAndNotify().catch((err) =>
-                console.error('[Updater] Check failed:', err.message)
-            );
-        };
-
-        setTimeout(checkForUpdates, 10000);
-
-        // Re-check every hour
-        setInterval(checkForUpdates, 60 * 60 * 1000);
-
         // Also handle manual restart request from renderer
         ipcMain.on('install-update', () => {
             autoUpdater.quitAndInstall();
+        });
+
+        checkForUpdateBeforeStartup().then(() => {
+            // No update found or update check failed — continue normal startup
+            setupBackgroundUpdateCheck();
         });
     }
 });

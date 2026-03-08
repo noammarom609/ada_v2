@@ -2,14 +2,70 @@ name: Build & Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
+  # First, bump version and create a tag
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+      tag: ${{ steps.bump.outputs.tag }}
+      should_release: ${{ steps.check.outputs.should_release }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if commit is version bump
+        id: check
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if [[ "$COMMIT_MSG" == chore:\ bump\ version* ]]; then
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "Skipping: this is a version bump commit"
+          else
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node.js
+        if: steps.check.outputs.should_release == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Bump patch version
+        if: steps.check.outputs.should_release == 'true'
+        id: bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          CURRENT=$(node -p "require('./package.json').version")
+          NEW=$(node -e "
+            const [major, minor, patch] = '$CURRENT'.split('.').map(Number);
+            console.log(major + '.' + minor + '.' + (patch + 1));
+          ")
+
+          npm version $NEW --no-git-tag-version
+          git add package.json
+          git commit -m "chore: bump version to $NEW"
+          git tag "v$NEW"
+          git push origin main --tags
+
+          echo "new_version=$NEW" >> $GITHUB_OUTPUT
+          echo "tag=v$NEW" >> $GITHUB_OUTPUT
+
   build:
+    needs: version
+    if: needs.version.outputs.should_release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -26,6 +82,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version.outputs.new_version }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -56,7 +114,8 @@ jobs:
           if-no-files-found: ignore
 
   publish:
-    needs: build
+    needs: [version, build]
+    if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -69,6 +128,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: Release ${{ needs.version.outputs.new_version }}
           files: artifacts/**/*
           generate_release_notes: true
           draft: false
