@@ -14,7 +14,10 @@
     "dist:all": "vite build && electron-builder --win --mac --linux"
   },
   "keywords": [],
-  "author": "Dvirious",
+  "author": {
+    "name": "Dvirious",
+    "email": "noammarom609@gmail.com"
+  },
   "license": "ISC",
   "build": {
     "appId": "com.jarvis.dvirious",
