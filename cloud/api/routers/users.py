@@ -2,6 +2,7 @@
 Users Router — user profile, settings sync, plan info.
 """
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from api.middleware import get_current_user, get_user_id
@@ -11,10 +12,10 @@ router = APIRouter()
 
 
 class UserSettings(BaseModel):
-    ai_name: str | None = None
-    face_auth_enabled: bool | None = None
-    camera_flipped: bool | None = None
-    tool_permissions: dict | None = None
+    ai_name: Optional[str] = None
+    face_auth_enabled: Optional[bool] = None
+    camera_flipped: Optional[bool] = None
+    tool_permissions: Optional[dict] = None
 
 
 @router.get("/me")
@@ -99,7 +100,7 @@ async def get_usage(user_id: str = Depends(get_user_id)):
     }
 
 
-def _get_daily_limit(plan: str) -> int | None:
+def _get_daily_limit(plan: str) -> Optional[int]:
     """Returns daily voice minute limit. None = unlimited."""
     limits = {
         "free": 30,
