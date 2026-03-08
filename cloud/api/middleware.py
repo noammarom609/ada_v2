@@ -45,15 +45,13 @@ async def get_current_user(
     header = _get_token_header(token)
     token_alg = header.get("alg", "unknown")
 
-    # Use the algorithm from the token header if it's an HMAC variant
+    # Supabase uses HS256; accept common HMAC variants
     allowed_algs = ["HS256", "HS384", "HS512"]
-    if token_alg not in allowed_algs:
-        print(f"[Auth Middleware] Token uses unexpected alg: {token_alg}, header: {header}")
-        # Still try — maybe it works with our secret
-        allowed_algs.append(token_alg)
 
     last_error = None
-    for secret in _SECRETS:
+    errors_by_secret = []
+
+    for i, secret in enumerate(_SECRETS):
         try:
             payload = jwt.decode(
                 token,
@@ -65,14 +63,21 @@ async def get_current_user(
             if not user_id:
                 raise HTTPException(status_code=401, detail="Invalid token: no user ID")
             return payload
-        except JWTError as e:
+        except Exception as e:
             last_error = e
+            errors_by_secret.append(f"secret[{i}]({type(secret).__name__}): {type(e).__name__}: {e}")
             continue
 
-    print(f"[Auth Middleware] JWT decode failed: {last_error}")
-    print(f"[Auth Middleware] Token alg: {token_alg}, tried {len(_SECRETS)} secrets, raw len: {len(_raw_secret)}")
-    print(f"[Auth Middleware] Token preview: {token[:20]}...{token[-10:]}")
-    raise HTTPException(status_code=401, detail=f"Invalid token: {str(last_error)}")
+    # All attempts failed — return diagnostic info
+    detail = (
+        f"JWT verification failed | "
+        f"alg={token_alg} | "
+        f"header={header} | "
+        f"secrets_tried={len(_SECRETS)} | "
+        f"errors={errors_by_secret}"
+    )
+    print(f"[Auth Middleware] {detail}")
+    raise HTTPException(status_code=401, detail=detail)
 
 
 async def get_user_id(user: dict = Depends(get_current_user)) -> str:
