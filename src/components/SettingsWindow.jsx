@@ -95,13 +95,14 @@ const SettingsWindow = ({
     };
 
     return (
-        <div className="absolute top-20 right-10 bg-gray-950/90 border border-white/10 p-6 rounded-2xl z-50 w-96 backdrop-blur-2xl shadow-[0_0_60px_rgba(94,234,212,0.06)]">
-            <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
+        <div className="absolute top-20 right-10 bg-gray-950/90 border border-white/10 p-6 rounded-2xl z-50 w-96 max-h-[calc(100vh-120px)] flex flex-col backdrop-blur-2xl shadow-[0_0_60px_rgba(94,234,212,0.06)]">
+            <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2 shrink-0">
                 <h2 className="text-teal-400 font-bold text-sm uppercase tracking-wider">Settings</h2>
                 <button onClick={onClose} className="text-teal-500 hover:text-teal-400">
                     <X size={16} />
                 </button>
             </div>
+            <div className="overflow-y-auto flex-1 pr-1 custom-scrollbar">
 
             {/* Authentication Section */}
             <div className="mb-6">
@@ -301,6 +302,7 @@ const SettingsWindow = ({
                     </button>
                 </div>
             )}
+            </div>
         </div>
     );
 };

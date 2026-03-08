@@ -28,6 +28,7 @@ import {
     reportUsage,
     logout as cloudLogout,
     getUserPlan,
+    setupSessionWatcher,
 } from './utils/auth';
 import { initAnalytics, Events, resetAnalytics, isPrivacyMode, setPrivacyMode } from './utils/analytics';
 
@@ -636,7 +637,8 @@ function App() {
 
                 // 1. Verify Model File
                 console.log("Fetching model file...");
-                const response = await fetch('./hand_landmarker.task');
+                const modelPath = new URL('hand_landmarker.task', window.location.href).href;
+                const response = await fetch(modelPath);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch model: ${response.status} ${response.statusText}`);
                 }
@@ -653,7 +655,7 @@ function App() {
                 console.log("Creating HandLandmarker (GPU)...");
                 handLandmarkerRef.current = await HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
-                        modelAssetPath: `./hand_landmarker.task`,
+                        modelAssetPath: modelPath,
                         delegate: "GPU" // Enable GPU acceleration
                     },
                     runningMode: "VIDEO",
@@ -764,6 +766,17 @@ function App() {
 
         initCloudSession();
     }, [cloudLoggedIn, socketConnected]);
+
+    // ── Cloud Auth: Session watcher (validates on app focus & periodically) ──
+    useEffect(() => {
+        if (!cloudLoggedIn) return;
+        setupSessionWatcher(() => {
+            console.warn('[Auth] Session expired — logging out');
+            setCloudLoggedIn(false);
+            setUserPlan('free');
+            setCloudFeatures(null);
+        });
+    }, [cloudLoggedIn]);
 
     // ── Cloud Auth: Periodic usage reporting (every 5 min) ──
     useEffect(() => {

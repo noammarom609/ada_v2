@@ -5,6 +5,10 @@ Uses Polar API for checkout, customer portal, and webhook handling.
 
 import os
 import json
+import hmac
+import hashlib
+import base64
+import time
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from api.middleware import get_current_user, get_user_id
@@ -208,6 +212,41 @@ async def get_plan(user_id: str = Depends(get_user_id)):
     return {"plan": plan}
 
 
+def _verify_webhook_signature(payload: bytes, headers: dict, secret: str) -> bool:
+    """Verify Polar/Svix webhook signature."""
+    msg_id = headers.get("webhook-id", "")
+    msg_ts = headers.get("webhook-timestamp", "")
+    msg_sig = headers.get("webhook-signature", "")
+
+    if not (msg_id and msg_ts and msg_sig):
+        return False
+
+    # Reject timestamps older than 5 minutes (replay protection)
+    try:
+        ts = int(msg_ts)
+        if abs(time.time() - ts) > 300:
+            return False
+    except (ValueError, TypeError):
+        return False
+
+    # Svix secret format: "whsec_<base64>" — strip prefix
+    secret_bytes = base64.b64decode(secret.replace("whsec_", ""))
+
+    # Compute expected signature: HMAC-SHA256(secret, "{msg_id}.{timestamp}.{body}")
+    to_sign = f"{msg_id}.{msg_ts}.{payload.decode('utf-8')}".encode("utf-8")
+    expected = base64.b64encode(
+        hmac.new(secret_bytes, to_sign, hashlib.sha256).digest()
+    ).decode("utf-8")
+
+    # Polar may send multiple signatures separated by space
+    for sig in msg_sig.split(" "):
+        sig_value = sig.split(",", 1)[-1] if "," in sig else sig
+        if hmac.compare_digest(expected, sig_value):
+            return True
+
+    return False
+
+
 @router.post("/webhook")
 async def polar_webhook(request: Request):
     """
@@ -216,14 +255,10 @@ async def polar_webhook(request: Request):
     """
     payload = await request.body()
 
-    # Polar webhook signature verification
-    # Polar uses svix for webhooks: webhook-id, webhook-timestamp, webhook-signature headers
+    # Verify webhook signature if secret is configured
     if POLAR_WEBHOOK_SECRET:
-        sig_id = request.headers.get("webhook-id", "")
-        sig_ts = request.headers.get("webhook-timestamp", "")
-        sig_sig = request.headers.get("webhook-signature", "")
-        if not (sig_id and sig_ts and sig_sig):
-            raise HTTPException(status_code=400, detail="Missing webhook signature headers")
+        if not _verify_webhook_signature(payload, dict(request.headers), POLAR_WEBHOOK_SECRET):
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
     try:
         event = json.loads(payload)

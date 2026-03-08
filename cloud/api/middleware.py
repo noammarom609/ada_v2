@@ -32,10 +32,12 @@ def _fetch_jwks() -> list:
         data = resp.json()
         _jwks_cache["keys"] = data.get("keys", [])
         _jwks_cache["fetched_at"] = now
-        print(f"[Auth Middleware] JWKS fetched: {len(_jwks_cache['keys'])} keys")
         return _jwks_cache["keys"]
     except Exception as e:
-        print(f"[Auth Middleware] JWKS fetch failed: {e}")
+        print(f"[Auth] JWKS fetch error: {e}")
+        # On failure, force a re-fetch next time (don't cache the failure)
+        if not _jwks_cache["keys"]:
+            _jwks_cache["fetched_at"] = 0
         return _jwks_cache["keys"]  # return stale if available
 
 
@@ -46,11 +48,11 @@ def _get_signing_key(token: str) -> tuple:
     """
     try:
         header = jwt.get_unverified_header(token)
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token header")
+    except (JWTError, Exception):
+        raise HTTPException(status_code=401, detail="Malformed token")
 
     kid = header.get("kid")
-    alg = header.get("alg", "HS256")
+    alg = header.get("alg", "RS256")
 
     jwks_keys = _fetch_jwks()
 
@@ -65,10 +67,8 @@ def _get_signing_key(token: str) -> tuple:
         public_key = jwk.construct(jwks_keys[0], alg)
         return public_key, alg
 
-    raise HTTPException(
-        status_code=401,
-        detail=f"No matching key found for kid={kid}, alg={alg}, jwks_url={_JWKS_URL}, keys_count={len(jwks_keys)}"
-    )
+    # No keys at all — likely JWKS fetch failed
+    raise HTTPException(status_code=401, detail="Authentication service unavailable")
 
 
 async def get_current_user(
@@ -90,13 +90,14 @@ async def get_current_user(
         )
         user_id = payload.get("sub")
         if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token: no user ID")
+            raise HTTPException(status_code=401, detail="Invalid token")
         return payload
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"[Auth Middleware] JWT decode failed: {type(e).__name__}: {e}")
-        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 async def get_user_id(user: dict = Depends(get_current_user)) -> str:
