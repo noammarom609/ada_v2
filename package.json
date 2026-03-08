@@ -1,6 +1,6 @@
 {
   "name": "dvirious",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Dvirious - AI Assistant",
   "main": "electron/main.js",
   "scripts": {
