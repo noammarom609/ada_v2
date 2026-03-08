@@ -73,6 +73,7 @@ async def signup(data: EmailSignup):
                 "email": result.user.email,
                 "access_token": result.session.access_token if result.session else None,
                 "refresh_token": result.session.refresh_token if result.session else None,
+                "expires_at": result.session.expires_at if result.session else None,
             }
         else:
             raise HTTPException(status_code=400, detail="Signup failed")

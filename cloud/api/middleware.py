@@ -1,14 +1,26 @@
 """Auth middleware — validates JWT from Supabase on every protected request."""
 
 import os
+import base64
 from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 
 security = HTTPBearer()
 
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
+_raw_secret = os.environ.get("SUPABASE_JWT_SECRET", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+
+# Supabase JWT secrets may be base64-encoded; pre-compute both forms
+_SECRETS = [_raw_secret]
+try:
+    _decoded = base64.b64decode(_raw_secret)
+    if _decoded != _raw_secret.encode():
+        _SECRETS.append(_decoded)
+except Exception:
+    pass
+
+_ALGORITHMS = ["HS256", "HS384", "HS512"]
 
 
 async def get_current_user(
@@ -19,23 +31,26 @@ async def get_current_user(
     Returns the decoded user payload (sub, email, etc.).
     """
     token = credentials.credentials
-    try:
-        # Supabase JWTs are signed with the JWT secret from project settings
-        # Allow HS256/HS384/HS512 to handle different Supabase configurations
-        payload = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256", "HS384", "HS512"],
-            audience="authenticated",
-        )
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token: no user ID")
-        return payload
-    except JWTError as e:
-        print(f"[Auth Middleware] JWT decode failed: {e}")
-        print(f"[Auth Middleware] JWT secret set: {bool(SUPABASE_JWT_SECRET)}, length: {len(SUPABASE_JWT_SECRET)}")
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    last_error = None
+    for secret in _SECRETS:
+        try:
+            payload = jwt.decode(
+                token,
+                secret,
+                algorithms=_ALGORITHMS,
+                audience="authenticated",
+            )
+            user_id = payload.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Invalid token: no user ID")
+            return payload
+        except JWTError as e:
+            last_error = e
+            continue
+
+    print(f"[Auth Middleware] JWT decode failed: {last_error}")
+    print(f"[Auth Middleware] Tried {len(_SECRETS)} secret forms, raw length: {len(_raw_secret)}")
+    raise HTTPException(status_code=401, detail=f"Invalid token: {str(last_error)}")
 
 
 async def get_user_id(user: dict = Depends(get_current_user)) -> str:
