@@ -1,6 +1,6 @@
 {
     "user_name": "Noam",
-    "ai_name": "Dvirious",
+    "ai_name": "Dvir",
     "setup_complete": true,
     "face_auth_enabled": false,
     "tool_permissions": {
@@ -16,5 +16,18 @@
     },
     "printers": [],
     "kasa_devices": [],
-    "camera_flipped": false
+    "camera_flipped": false,
+    "cloud_plan": "free",
+    "cloud_features": {
+        "voice_chat": true,
+        "cad_generation": false,
+        "cad_iteration": false,
+        "web_agent": false,
+        "smart_home": false,
+        "printer_control": false,
+        "file_operations": true,
+        "projects": true,
+        "run_command": false
+    },
+    "cloud_model": "models/gemini-2.5-flash-native-audio-preview-12-2025"
 }
