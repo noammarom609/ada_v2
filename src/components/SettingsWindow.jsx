@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { isPrivacyMode, setPrivacyMode } from '../utils/analytics';
 
 const TOOLS = [
     { id: 'generate_cad', label: 'Generate CAD' },
@@ -41,6 +42,7 @@ const SettingsWindow = ({
 }) => {
     const [permissions, setPermissions] = useState({});
     const [faceAuthEnabled, setFaceAuthEnabled] = useState(false);
+    const [privacyEnabled, setPrivacyEnabled] = useState(() => isPrivacyMode());
 
     useEffect(() => {
         // Request initial permissions
@@ -111,6 +113,29 @@ const SettingsWindow = ({
                     >
                         <div
                             className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${faceAuthEnabled ? 'translate-x-4' : 'translate-x-0'}`}
+                        />
+                    </button>
+                </div>
+            </div>
+
+            {/* Privacy Section */}
+            <div className="mb-6">
+                <h3 className="text-teal-400 font-medium mb-3 text-xs uppercase tracking-wider opacity-80">Privacy</h3>
+                <div className="flex items-center justify-between text-xs bg-gray-900/50 p-2 rounded border border-white/10">
+                    <div>
+                        <span className="text-gray-300">Privacy Mode</span>
+                        <p className="text-[9px] text-gray-600 mt-0.5">Disables all analytics and error reporting</p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            const next = !privacyEnabled;
+                            setPrivacyEnabled(next);
+                            setPrivacyMode(next);
+                        }}
+                        className={`relative w-8 h-4 rounded-full transition-colors duration-200 ${privacyEnabled ? 'bg-teal-500' : 'bg-gray-700'}`}
+                    >
+                        <div
+                            className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${privacyEnabled ? 'translate-x-4' : 'translate-x-0'}`}
                         />
                     </button>
                 </div>

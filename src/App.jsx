@@ -29,8 +29,7 @@ import {
     logout as cloudLogout,
     getUserPlan,
 } from './utils/auth';
-
-
+import { initAnalytics, Events, resetAnalytics, isPrivacyMode, setPrivacyMode } from './utils/analytics';
 
 const socket = io('http://localhost:8001');
 const { ipcRenderer } = window.require('electron');
@@ -744,6 +743,12 @@ function App() {
                         features: session.features,
                     });
                 }
+
+                // Initialize analytics after successful session
+                const userId = localStorage.getItem('dvirious_user_id');
+                initAnalytics(userId, session.plan);
+                Events.appOpened();
+                Events.sessionStarted(session.plan);
 
                 // Mark setup as complete since user is authenticated
                 setSetupComplete(true);

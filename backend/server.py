@@ -19,6 +19,16 @@ from pathlib import Path
 
 
 
+# ── Sentry Error Reporting (Python Backend) ──────────────────
+SENTRY_DSN_BACKEND = os.environ.get('SENTRY_DSN_BACKEND', '')
+if SENTRY_DSN_BACKEND:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=SENTRY_DSN_BACKEND, traces_sample_rate=0.1)
+        print('[Sentry] Python backend initialized')
+    except ImportError:
+        print('[Sentry] sentry-sdk not installed, skipping')
+
 # Ensure we can import ada
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 

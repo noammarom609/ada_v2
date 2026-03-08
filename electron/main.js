@@ -3,6 +3,18 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 
+// ── Sentry Error Reporting (Main Process) ──────────────────
+const SENTRY_DSN = process.env.VITE_SENTRY_DSN || '';
+if (SENTRY_DSN) {
+    try {
+        const Sentry = require('@sentry/electron/main');
+        Sentry.init({ dsn: SENTRY_DSN });
+        console.log('[Sentry] Main process initialized');
+    } catch (err) {
+        console.warn('[Sentry] Main process init skipped:', err.message);
+    }
+}
+
 app.commandLine.appendSwitch('use-angle', 'd3d11');
 app.commandLine.appendSwitch('enable-features', 'Vulkan');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
