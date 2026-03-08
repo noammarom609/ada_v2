@@ -168,6 +168,88 @@ function startPythonBackend() {
     });
 }
 
+// ── Blocking update check at startup ──────────────────────────
+// Returns a promise that resolves when no update is found (or on error).
+// If an update IS found, it downloads and quitAndInstall — the app restarts
+// and this promise never resolves (which is fine, the process exits).
+function checkForUpdateBeforeStartup() {
+    return new Promise((resolve) => {
+        const UPDATE_CHECK_TIMEOUT = 15000; // 15s max wait
+
+        const timeout = setTimeout(() => {
+            console.log('[Updater] Update check timed out, continuing startup...');
+            resolve();
+        }, UPDATE_CHECK_TIMEOUT);
+
+        autoUpdater.on('update-not-available', () => {
+            console.log('[Updater] App is up to date.');
+            clearTimeout(timeout);
+            resolve();
+        });
+
+        autoUpdater.on('error', (err) => {
+            console.error('[Updater] Error:', err.message);
+            clearTimeout(timeout);
+            resolve(); // Don't block the app on errors
+        });
+
+        autoUpdater.on('update-available', (info) => {
+            console.log('[Updater] Update available:', info.version);
+            // autoDownload is true, so download starts automatically
+            if (mainWindow) {
+                mainWindow.webContents.send('update-status', {
+                    status: 'downloading',
+                    version: info.version,
+                });
+            }
+        });
+
+        autoUpdater.on('download-progress', (progress) => {
+            const pct = Math.round(progress.percent);
+            console.log(`[Updater] Download: ${pct}%`);
+            if (mainWindow) {
+                mainWindow.webContents.send('update-status', {
+                    status: 'progress',
+                    percent: pct,
+                });
+            }
+        });
+
+        autoUpdater.on('update-downloaded', (info) => {
+            console.log('[Updater] Update downloaded. Installing and restarting...');
+            clearTimeout(timeout);
+            if (mainWindow) {
+                mainWindow.webContents.send('update-status', {
+                    status: 'installing',
+                    version: info.version,
+                });
+            }
+            // Small delay so the renderer can show "installing" state
+            setTimeout(() => {
+                autoUpdater.quitAndInstall(false, true);
+            }, 1500);
+            // Don't resolve — the app will restart
+        });
+
+        console.log('[Updater] Checking for updates before startup...');
+        autoUpdater.checkForUpdates().catch((err) => {
+            console.error('[Updater] Check failed:', err.message);
+            clearTimeout(timeout);
+            resolve();
+        });
+    });
+}
+
+// Background check every hour (after the initial blocking check)
+function setupBackgroundUpdateCheck() {
+    const checkForUpdates = () => {
+        autoUpdater.checkForUpdatesAndNotify().catch((err) =>
+            console.error('[Updater] Background check failed:', err.message)
+        );
+    };
+    setInterval(checkForUpdates, 60 * 60 * 1000);
+}
+
 app.whenReady().then(() => {
     ipcMain.on('window-minimize', () => {
         if (mainWindow) mainWindow.minimize();
@@ -187,18 +269,6 @@ app.whenReady().then(() => {
         if (mainWindow) mainWindow.close();
     });
 
-    checkBackendPort(8001).then((isTaken) => {
-        if (isTaken) {
-            console.log('Port 8001 is taken. Assuming backend is already running manually.');
-            waitForBackend().then(createWindow);
-        } else {
-            startPythonBackend();
-            setTimeout(() => {
-                waitForBackend().then(createWindow);
-            }, 1000);
-        }
-    });
-
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
@@ -209,22 +279,36 @@ app.whenReady().then(() => {
         handleAuthDeepLink(url);
     });
 
-    // ── Auto-Updater (GitHub Releases) ──────────────────────────
-    // Checks for updates BEFORE the app loads. If an update is found,
-    // it downloads and installs it immediately (app restarts).
+    // ── Startup flow: check for updates FIRST, then load app ──
+    const startApp = () => {
+        checkBackendPort(8001).then((isTaken) => {
+            if (isTaken) {
+                console.log('Port 8001 is taken. Assuming backend is already running manually.');
+                waitForBackend().then(createWindow);
+            } else {
+                startPythonBackend();
+                setTimeout(() => {
+                    waitForBackend().then(createWindow);
+                }, 1000);
+            }
+        });
+    };
+
     if (!isDev) {
         autoUpdater.autoDownload = true;
         autoUpdater.autoInstallOnAppQuit = true;
 
-        // Also handle manual restart request from renderer
         ipcMain.on('install-update', () => {
             autoUpdater.quitAndInstall();
         });
 
+        // Check for update BEFORE starting backend/window
         checkForUpdateBeforeStartup().then(() => {
-            // No update found or update check failed — continue normal startup
             setupBackgroundUpdateCheck();
+            startApp();
         });
+    } else {
+        startApp();
     }
 });
 
