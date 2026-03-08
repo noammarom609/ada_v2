@@ -21,10 +21,11 @@ async def get_current_user(
     token = credentials.credentials
     try:
         # Supabase JWTs are signed with the JWT secret from project settings
+        # Allow HS256/HS384/HS512 to handle different Supabase configurations
         payload = jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
+            algorithms=["HS256", "HS384", "HS512"],
             audience="authenticated",
         )
         user_id = payload.get("sub")

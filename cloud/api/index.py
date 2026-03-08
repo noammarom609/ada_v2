@@ -60,12 +60,24 @@ async def env_check():
 async def test_token(token: str = ""):
     """Temporary debug endpoint — test JWT decode."""
     from jose import jwt, JWTError
-    import base64
+    import base64, json
     jwt_secret = os.environ.get("SUPABASE_JWT_SECRET", "")
     results = {}
 
     if not token:
         return {"error": "Pass ?token=YOUR_JWT"}
+
+    # Decode the JWT header without verification to see the alg
+    try:
+        header_b64 = token.split('.')[0]
+        # Add padding if needed
+        padding = 4 - len(header_b64) % 4
+        if padding != 4:
+            header_b64 += '=' * padding
+        header = json.loads(base64.urlsafe_b64decode(header_b64))
+        results["token_header"] = header
+    except Exception as e:
+        results["token_header_error"] = str(e)
 
     # Try 1: raw secret string
     try:
@@ -88,5 +100,12 @@ async def test_token(token: str = ""):
         results["no_aud_check"] = {"success": True, "sub": payload.get("sub"), "aud": payload.get("aud")}
     except JWTError as e:
         results["no_aud_check"] = {"success": False, "error": str(e)}
+
+    # Try 4: allow all common algorithms
+    try:
+        payload = jwt.decode(token, jwt_secret, algorithms=["HS256", "HS384", "HS512", "RS256"], options={"verify_aud": False})
+        results["any_alg"] = {"success": True, "sub": payload.get("sub"), "alg_used": header.get("alg") if 'header' in dir() else "unknown"}
+    except Exception as e:
+        results["any_alg"] = {"success": False, "error": str(e)}
 
     return results

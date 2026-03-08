@@ -65,13 +65,8 @@ async def signup(data: EmailSignup):
         })
 
         if result.user:
-            # Create user profile in our custom table
-            sb.table("profiles").insert({
-                "id": result.user.id,
-                "email": data.email,
-                "display_name": data.display_name,
-                "plan": "free",
-            }).execute()
+            # Profile is auto-created by the handle_new_user() trigger
+            # on auth.users INSERT — no manual insert needed.
 
             return {
                 "user_id": result.user.id,
