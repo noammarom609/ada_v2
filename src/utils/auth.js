@@ -6,7 +6,7 @@
 const CLOUD_API_URL =
     localStorage.getItem('cloud_api_url') ||
     import.meta.env.VITE_CLOUD_API_URL ||
-    'https://dvirious.vercel.app';
+    'https://dvirius-m7f7.vercel.app';
 
 const TOKEN_KEYS = {
     access: 'dvirious_access_token',

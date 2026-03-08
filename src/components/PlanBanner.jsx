@@ -36,7 +36,7 @@ const PLAN_CONFIG = {
     },
 };
 
-const CHECKOUT_BASE = import.meta.env.VITE_CLOUD_API_URL || 'https://dvirious.vercel.app';
+const CHECKOUT_BASE = import.meta.env.VITE_CLOUD_API_URL || 'https://dvirius-m7f7.vercel.app';
 
 const PlanBanner = ({ plan = 'free', usage = {}, features = null, onUpgrade }) => {
     const [expanded, setExpanded] = useState(false);
