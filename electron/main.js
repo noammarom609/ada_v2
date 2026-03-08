@@ -294,11 +294,17 @@ function checkBackendPort(port) {
     });
 }
 
-function waitForBackend() {
+function waitForBackend(timeoutMs = 30000) {
     return new Promise((resolve) => {
+        const startTime = Date.now();
         const check = () => {
+            if (Date.now() - startTime > timeoutMs) {
+                console.error(`Backend did not respond within ${timeoutMs / 1000}s. Opening window anyway.`);
+                resolve();
+                return;
+            }
             const http = require('http');
-            http.get('http://127.0.0.1:8001/status', (res) => {
+            const req = http.get('http://127.0.0.1:8001/status', (res) => {
                 if (res.statusCode === 200) {
                     console.log('Backend is ready!');
                     resolve();
@@ -306,8 +312,14 @@ function waitForBackend() {
                     console.log('Backend not ready, retrying...');
                     setTimeout(check, 1000);
                 }
-            }).on('error', (err) => {
+            });
+            req.on('error', (err) => {
                 console.log('Waiting for backend...');
+                setTimeout(check, 1000);
+            });
+            req.setTimeout(5000, () => {
+                req.destroy();
+                console.log('Backend request timed out, retrying...');
                 setTimeout(check, 1000);
             });
         };
