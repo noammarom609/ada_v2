@@ -67,10 +67,15 @@ function handleAuthDeepLink(url) {
                 : '';
 
         const params = new URLSearchParams(paramString);
+        // Supabase returns expires_in (seconds), convert to expires_at (unix timestamp)
+        const expiresIn = params.get('expires_in');
+        const expiresAt = expiresIn
+            ? Math.floor(Date.now() / 1000) + parseInt(expiresIn, 10)
+            : params.get('expires_at');
         const authData = {
             access_token: params.get('access_token'),
             refresh_token: params.get('refresh_token'),
-            expires_at: params.get('expires_at'),
+            expires_at: expiresAt ? String(expiresAt) : null,
             token_type: params.get('token_type'),
         };
 
@@ -252,11 +257,16 @@ app.whenReady().then(() => {
         });
 
         // Check for updates after window is ready (delay to avoid startup load)
-        setTimeout(() => {
+        const checkForUpdates = () => {
             autoUpdater.checkForUpdatesAndNotify().catch((err) =>
                 console.error('[Updater] Check failed:', err.message)
             );
-        }, 10000);
+        };
+
+        setTimeout(checkForUpdates, 10000);
+
+        // Re-check every hour
+        setInterval(checkForUpdates, 60 * 60 * 1000);
 
         // Also handle manual restart request from renderer
         ipcMain.on('install-update', () => {

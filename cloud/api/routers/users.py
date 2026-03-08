@@ -27,7 +27,18 @@ async def get_profile(user: dict = Depends(get_current_user)):
     result = sb.table("profiles").select("*").eq("id", user_id).single().execute()
 
     if not result.data:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        # Auto-create profile for OAuth users (who bypass /signup)
+        email = user.get("email", "")
+        display_name = user.get("user_metadata", {}).get("full_name", "") or email.split("@")[0]
+        sb.table("profiles").insert({
+            "id": user_id,
+            "email": email,
+            "display_name": display_name,
+            "plan": "free",
+        }).execute()
+        result = sb.table("profiles").select("*").eq("id", user_id).single().execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Profile creation failed")
 
     profile = result.data
     return {
